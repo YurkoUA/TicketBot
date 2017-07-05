@@ -1,24 +1,42 @@
-﻿using System.Net;
+﻿using System;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Connector;
+using TicketBot.Services;
 
 namespace TicketBot
 {
     [BotAuthentication]
     public class MessagesController : ApiController
     {
-        /// <summary>
-        /// POST: api/Messages
-        /// Receive a message from a user and reply to it
-        /// </summary>
         public async Task<HttpResponseMessage> Post([FromBody]Activity activity)
         {
             if (activity.Type == ActivityTypes.Message)
             {
-                await Conversation.SendAsync(activity, () => new Dialogs.RootDialog());
+                var connector = new ConnectorClient(new Uri(activity.ServiceUrl));
+                Activity reply = null;
+
+                try
+                {
+                    reply = activity.CreateReply(await GetResponse(activity.Text));
+                }
+                catch (ArgumentException ex)
+                {
+                    reply = activity.CreateReply(ex.Message);
+                }
+                catch
+                {
+                    reply = activity.CreateReply("Помилка.");
+                }
+                finally
+                {
+                    await connector.Conversations.ReplyToActivityAsync(reply);
+                }
             }
             else
             {
@@ -26,6 +44,31 @@ namespace TicketBot
             }
             var response = Request.CreateResponse(HttpStatusCode.OK);
             return response;
+        }
+
+        private async Task<string> GetResponse(string command)
+        {
+            var service = new TicketService();
+
+            if (command.Equals("/total", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return (await service.GetTotalTickets()).ToString();
+            }
+            else if (command.Equals("/random", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return (await service.GetRandomTicket()).ToString();
+            }
+            else if (command.Split(' ').First().Equals("/number", StringComparison.CurrentCultureIgnoreCase))
+            {
+                var number = command.Split(' ').Last();
+
+                if (!Regex.IsMatch(number, @"\d{6}") || string.IsNullOrEmpty(number))
+                    return "Необхідно ввести номер квитка.";
+
+                var tickets = await service.GetTickets(number);
+                return string.Join("<br/><br/>", tickets.Select(t => t.ToString()));
+            }
+            return "Даної команди не існує.";
         }
 
         private Activity HandleSystemMessage(Activity message)
