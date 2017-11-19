@@ -11,35 +11,48 @@ namespace TicketBot.Services
 {
     public class TicketService
     {
-        private const string BASE_URL = "http://ticket-ms.somee.com";
+        private string _baseUrl;
+        private bool _isPartialMatchesAllowed;
 
-        public async Task<TotalResponse> GetTotalTickets()
+        public TicketService(string baseUrl, bool isPartialMatchesAllowed)
         {
-            var response = await GetRequest("/Bot/Total");
-            return await DeserializeRequest<TotalResponse>(response);
+            _baseUrl = baseUrl;
+            _isPartialMatchesAllowed = isPartialMatchesAllowed;
+        }
+
+        public async Task<CountTicketsResponse> GetCountOfTickets()
+        {
+            var response = await GetRequest("Ticket/GetCount");
+            return await DeserializeResponse<CountTicketsResponse>(response);
+        }
+
+        public async Task<CountPackagesResponse> GetCountOfPackages()
+        {
+            var response = await GetRequest("Package/GetCount");
+            return await DeserializeResponse<CountPackagesResponse>(response);
         }
 
         public async Task<Ticket> GetRandomTicket()
         {
-            var response = await GetRequest("/Bot/Random");
+            var response = await GetRequest("Ticket/GetRandom");
 
-            var ticket = await DeserializeRequest<Ticket>(response);
-            ticket.Url = ticket.Url.Insert(0, BASE_URL);
+            var ticket = await DeserializeResponse<Ticket>(response);
+            ticket.Url = $"{_baseUrl}Details/{ticket.Id}";
             return ticket;
         }
 
         public async Task<IEnumerable<Ticket>> GetTickets(string number)
         {
-            var response = await GetRequest("/Bot/Number/?number=" + number);
+            var response = await GetRequest($"Ticket/Search/{number}?partialMatches={_isPartialMatchesAllowed}");
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 throw new ArgumentException($"Квитки з №{number} не знайдено.");
 
-            var tickets = await DeserializeRequest<IEnumerable<Ticket>>(response);
+            var tickets = await DeserializeResponse<IEnumerable<Ticket>>(response);
 
             tickets.ToList().ForEach(t =>
             {
-                t.Url = t.Url.Insert(0, BASE_URL);
+                t.Url = $"{_baseUrl}Details/{t.Id}";
             });
 
             return tickets;
@@ -47,11 +60,15 @@ namespace TicketBot.Services
 
         private async Task<HttpResponseMessage> GetRequest(string url)
         {
-            var client = new HttpClient();
-            return await client.GetAsync(BASE_URL + url);
+            var client = new HttpClient
+            {
+                BaseAddress = new Uri(_baseUrl + "api/")
+            };
+
+            return await client.GetAsync(url);
         }
 
-        private async Task<T> DeserializeRequest<T>(HttpResponseMessage response)
+        private async Task<T> DeserializeResponse<T>(HttpResponseMessage response)
         {
             return JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());
         }

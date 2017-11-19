@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -48,11 +49,15 @@ namespace TicketBot
 
         private async Task<string> GetResponse(string command)
         {
-            var service = new TicketService();
+            var service = CreateService();
 
             if (command.Equals("/total", StringComparison.CurrentCultureIgnoreCase))
             {
-                return (await service.GetTotalTickets()).ToString();
+                return (await service.GetCountOfTickets()).ToString();
+            }
+            else if (command.Equals("/packages", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return (await service.GetCountOfPackages()).ToString();
             }
             else if (command.Equals("/random", StringComparison.CurrentCultureIgnoreCase))
             {
@@ -62,12 +67,19 @@ namespace TicketBot
             {
                 var number = command.Split(' ').Last();
 
-                if (!Regex.IsMatch(number, @"\d{6}") || string.IsNullOrEmpty(number))
-                    return "Необхідно ввести номер квитка.";
+                if (!Regex.IsMatch(number, @"^\d{3,6}$") || string.IsNullOrEmpty(number))
+                    return "Необхідно ввести від 3 до 6 цифр.";
 
                 var tickets = await service.GetTickets(number);
-                return string.Join("<br/><br/>", tickets.Select(t => t.ToString()));
+                return string.Join("<br/>***<br/>", tickets.Select(t => t.ToString()));
             }
+            
+
+            else if (command.Equals("/start", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return "Вас вітає Ticket MS Bot!";
+            }
+
             return "Даної команди не існує.";
         }
 
@@ -98,6 +110,14 @@ namespace TicketBot
             }
 
             return null;
+        }
+
+        private TicketService CreateService()
+        {
+            var baseUrl = ConfigurationManager.AppSettings["BaseUrl"];
+            var partialMatches = Convert.ToBoolean(ConfigurationManager.AppSettings["IsPartialMatchesAllowed"]);
+
+            return new TicketService(baseUrl, partialMatches);
         }
     }
 }
