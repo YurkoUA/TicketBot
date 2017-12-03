@@ -71,7 +71,7 @@ namespace TicketBot
                     return "Необхідно ввести від 3 до 6 цифр.";
 
                 var tickets = await service.GetTickets(number);
-                return string.Join("<br/>***<br/>", tickets.Select(t => t.ToString()));
+                return string.Join("<br/>--------<br/>", tickets.Select(t => t.ToString()));
             }
             
 

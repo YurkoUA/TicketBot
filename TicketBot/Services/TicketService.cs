@@ -37,7 +37,7 @@ namespace TicketBot.Services
             var response = await GetRequest("Ticket/GetRandom");
 
             var ticket = await DeserializeResponse<Ticket>(response);
-            ticket.Url = $"{_baseUrl}Details/{ticket.Id}";
+            ticket.Url = $"{_baseUrl}Ticket/Details/{ticket.Id}";
             return ticket;
         }
 
@@ -45,7 +45,7 @@ namespace TicketBot.Services
         {
             var response = await GetRequest($"Ticket/Search/{number}?partialMatches={_isPartialMatchesAllowed}");
 
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.NoContent)
                 throw new ArgumentException($"Квитки з №{number} не знайдено.");
 
             var tickets = await DeserializeResponse<IEnumerable<Ticket>>(response);
